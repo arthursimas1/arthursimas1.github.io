@@ -1,0 +1,63 @@
+---
+title: My personal website
+---
+
+import { Avatar } from 'components/blog/BlogHeader'
+import PageHead from 'components/PageHead'
+
+<PageHead />
+
+<style jsx global>{`
+body {
+  --bg-color-radial: #ddd;
+  --bg-size: 50px;
+  background: fixed 0 0 / var(--bg-size) var(--bg-size) radial-gradient(var(--bg-color-radial) 1px, transparent 0),
+    fixed calc(var(--bg-size) / 2) calc(var(--bg-size) / 2) / var(--bg-size) var(--bg-size) radial-gradient(var(--bg-color-radial) 1px, transparent 0);
+}
+.dark body {
+  --bg-color-radial: #333;
+}
+`}</style>
+
+{<div className='flex items-center flex-shrink-0 justify-center my-8'>
+  <Avatar author={{ name: 'Arthur Simas', picture: '/assets/people/arthursimas.jpg' }} size={200} />
+</div>}
+
+<h1 className="text-center font-extrabold text-4xl md:text-5xl">Arthur Simas</h1>
+
+{<div className="mx-auto max-w-full w-[880px] text-center px-4 my-10">
+  <p className="mb-2 text-gray-600 text-xl md:text-2xl">
+    Software engineer, Computer Scientist & Master's Student in Computer Engineering
+  </p>
+</div>}
+
+Location: São Paulo, Brazil\
+LinkedIn: [arthursimas](https://linkedin.com/in/arthursimas)\
+GitHub: [arthursimas1](https://github.com/arthursimas1)\
+ORCID: [0000-0001-7705-4929](https://orcid.org/0000-0001-7705-4929)\
+Lattes: [7361619387683682](https://lattes.cnpq.br/7361619387683682)
+
+## Education
+
+- (current) **MSc in Computer Engineering**: University of Campinas (UNICAMP)
+- **BSc in Computer Science**: Federal University of São Carlos (UFSCar)
+
+## Certifications
+
+- [Oracle Machine Learning using Autonomous Database, Specialist | 1Z0-1096-21](https://catalog-education.oracle.com/pls/certview/sharebadge?id=8E116F0905B36B7A451160C97E50FD3338897490423A2FAB720714E3773D4E5C)
+- [Oracle Cloud Infrastructure Architect, Associate | 1Z0-1072-21](https://catalog-education.oracle.com/pls/certview/sharebadge?id=524B3C7AD33D679479957E56D1930C901D3B5A2D31E1496A603D218D31D0D7CF)
+- [Oracle Cloud Infrastructure Developer, Associate | 1Z0-1084-21](https://catalog-education.oracle.com/pls/certview/sharebadge?id=7FE12A9024E9B73A0EE767CB5E86F3F77B9E4E5F4EAC88DE69E59E1F16C90156)
+- [Oracle Cloud Infrastructure Foundations, Associate | 1Z0-1085-21](https://catalog-education.oracle.com/pls/certview/sharebadge?id=10F713BE1C9BD91D09CB8D553B9208E4F32E8771038CC2F01CCCCBD2DAABA4F1)
+
+
+## Short Bio
+
+I am currently a full-time MSc student at University of Campinas (UNICAMP), where I am part of the [INTRIG Research Group](https://intrig.dca.fee.unicamp.br/). I hold a Bachelor's degree in Computer Science from Federal University of São Carlos (UFSCar). During my undergraduate studies, I worked on an Undergraduate Research in the field of Artificial Intelligence entitled "_Towards a Power Saving Framework Using Gamification in Cognitive Power Meters_". I also completed my Final Graduation Project in the field of Computing Education entitled "_e-atlas: Tools to Facilitate the Development of School Digital Atlases_" with the help of an Extension Activity Grant to develop my contributions.
+
+Furthermore, I served as a tutor for three different classes, including Introduction to Programming, Algorithms and Programming, and Organization and Retrieval of Information. After graduating, I gained experience as a Software Engineer in the area of data analysis and business intelligence.
+
+As a current Master's student, I am advising some undergraduate students, which rendered in an accepted demo paper co-authored with my undergraduate students. I have gained experience in work, tutoring, and research experience in collaboration with Ericsson-funded projects, including to the research project "_5G Services in Programmable Networks with Machine Learning_", contributing to the development of a framework to capture 5G traces and YouTube QoE metrics, and also in a live 5G operational dataset collection campaigns in São Paulo and Campinas.
+
+## Research interests
+{/* Sample: My research domain is Software Engineering where I perform empirical studies at a large scale. My work focus on studying different aspect of software maintenance. In particular, I am interested in automatizing some aspects the software maintenance. I am working on the topic of SE for Docker, Automatic Program Repair (APR), Bugs, Software Debloat, Software Builds, and Continuous Integration services. */}
+My fields of interest includes (but not limited to): Cloud Computing, Infrastructure as a Code, Computer Networking, Programmable Data Planes, Internet of Things, Applied Machine Learning, Distributed Systems, Computing Education.

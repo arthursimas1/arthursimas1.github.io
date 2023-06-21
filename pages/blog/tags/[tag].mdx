@@ -1,0 +1,19 @@
+---
+title: Tagged Posts
+searchable: false
+---
+
+import BlogListing from 'components/blog/BlogListing'
+import { PagesByTags } from 'components/blog/BlogPages'
+import TagName from 'components/blog/tagname'
+import PageHead from 'components/PageHead'
+
+<PageHead />
+
+{<div className='max-w-screen-lg mx-auto pt-4 pb-8 mb-16 border-b border-gray-400 border-opacity-20'>
+  <h1 className='text-4xl tracking-tighter text-center font-bold md:text-5xl mt-8 pb-6'>
+    Posts Tagged with “<TagName />”
+  </h1>
+</div>}
+
+<BlogListing pages={PagesByTags({ route: '/blog', tag: TagName() })} style='articles' />

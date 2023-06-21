@@ -1,0 +1,29 @@
+{
+  "*": {
+    "type": "page",
+    "theme": {
+      "timestamp": false
+    }
+  },
+  "index": {
+    "title": "Home"
+  },
+  "research": {
+    "title": "Research",
+    "theme": {
+      "typesetting": "article"
+    }
+  },
+  "open-source": {
+    "title": "Open Source",
+    "theme": {
+      "typesetting": "article"
+    }
+  },
+  "blog": {
+    "title": "Blog",
+    "theme": {
+      "typesetting": "article"
+    }
+  }
+}

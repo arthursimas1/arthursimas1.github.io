@@ -1,0 +1,17 @@
+---
+title: Research
+description: Some of my research projects and contributions
+---
+
+import BlogListing from 'components/blog/BlogListing'
+import { AllPages } from 'components/blog/BlogPages'
+import PageHead from 'components/PageHead'
+
+<PageHead />
+
+{<div className='max-w-screen-lg mx-auto pt-4 pb-8 mb-16 border-b border-gray-400 border-opacity-20'>
+  <h1 className='text-4xl tracking-tighter text-center font-bold md:text-5xl mt-8 pb-6'>Research</h1>
+  <p className='text-center text-gray-500 dark:text-gray-400 font-space-grotesk'>Some of my research projects and contributions</p>
+</div>}
+
+<BlogListing pages={AllPages({ route: '/research' })} style='projects' />

@@ -1,0 +1,46 @@
+---
+title: 'owi: Open Weather IoT'
+description: An open-sourced IoT weather station
+image: /assets/open-source/owi/pcb.jpg
+preview: /assets/open-source/owi/pcb-small.jpg
+---
+
+import { Callout } from 'nextra/components'
+import Giscus from 'lib/giscus'
+import BlogHeader from 'components/blog/BlogHeader'
+
+<BlogHeader />
+
+<Callout type='info'>
+  **GitHub**: [github.com/open-weather-iot](https://github.com/open-weather-iot)
+</Callout>
+
+---
+
+Open Weather IoT is an open-source project consisting of a flexible modular framework designed for constructing weather stations using IoT technology. With its adaptable architecture, the project can be easily customized and extended to incorporate a wide range of sensors and components.
+
+## Modules
+The current modules included in the weather station base are:
+- 🌡️ [Temperature Module](https://github.com/open-weather-iot/temperature-module): PT100 sensor with MAX31685 resistance-to-digital (RTD) converter.
+- 💧 [Relative Humidity Module](https://github.com/open-weather-iot/humidity-module): HDC1080 sensor.
+- ☁️ [Atmospheric Pressure Module](https://github.com/open-weather-iot/pressure-module): BME680 sensor.
+- 🌬️ [Wind Direction Module](https://github.com/open-weather-iot/wind-direction-module) and [Wind Velocity Module](https://github.com/open-weather-iot/wind-velocity-module): Custom-built measurement instruments based on HMC5883L as a Hall effect sensor.
+- ⚡ [Power Supply Module](https://github.com/open-weather-iot/power-supply-module): Internal ADCs of the board for monitoring internal, battery, and solar panel voltages.
+
+These modules serve as a foundation, and the modular design of the project allows for seamless integration of additional sensors and components tailored to specific weather monitoring needs.
+
+The weather stations transmit the measured data at regular intervals to the base station using the LoRaWAN protocol.
+
+Thanks to its modular structure, the project allows for easy addition, replacement, or removal of measurement instruments. Even the communication protocol can be substituted.
+
+All the modules are developed in MicroPython and aim to adhere to the [style guide](https://github.com/open-weather-iot/template-module) for ease of contribution, integration, and project understanding. Changes to the style guide may be made to improve it or to accommodate specific sensor peculiarities. The [final code](https://github.com/open-weather-iot/owi-station) integrates all the sensors.
+
+## API
+The [API](https://github.com/open-weather-iot/owi-api) is developed in NodeJS with TypeScript and utilizes the MongoDB database. It is hosted on the [Render](https://render.com/) service at [owi-server.onrender.com](https://owi-server.onrender.com). Updates to the API repository are automatically reflected on Render within a few minutes.
+
+The API provides a WebSocket-enabled endpoint that allows the integration with Grafana dashboards. By utilizing the API's WebSocket connection, users can create customized Grafana dashboards to visualize and analyze weather station data. This enables real-time monitoring and in-depth analysis of temperature, relative humidity, atmospheric pressure, wind direction, wind velocity, and other sensor readings.
+
+## Using the API
+Several [client examples](https://github.com/open-weather-iot/owi-client-examples) have been developed to demonstrate the usage of the data provided by the API in R and Python.
+
+<Giscus />
