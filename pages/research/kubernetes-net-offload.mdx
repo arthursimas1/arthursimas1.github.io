@@ -1,0 +1,42 @@
+---
+title: 'OffKube: Kubernetes Networking Offload'
+description: Offloading Strategies for Next-Generation Programmable Infrastructures
+image: /assets/research/kubernetes-net-offload/kubernetes-architecture.png
+preview: /assets/research/kubernetes-net-offload/kubernetes-icon-small.png
+---
+
+import { Callout } from 'nextra/components'
+import Giscus from 'lib/giscus'
+import BlogHeader from 'components/blog/BlogHeader'
+
+<BlogHeader />
+
+{/*<Callout type='info'>
+  **GitHub**: [x](https://x)
+</Callout>*/}
+
+## Abstract
+In the context of modern IT infrastructures, many efforts have been made to move applications to the cloud and move away from highly specialized hardware boxes to commercial-off-the-shelf (COTS) equipment. To support emerging verticals and applications that will stress network traffic even more, there is ongoing research towards cloud-native applications, including the development of a new mobile network core used in the 5G Core.
+
+It is clear that we need to improve resource utilization in data centers to support the growing demand for more strict infrastructure requirements &mdash; _e.g._ low latency, high throughput, high reliability, scalability, and energy efficiency; which can all be translated to cost efficiency, in the end. This is particularly important for use cases such as the 5G Core and the upcoming 6G.
+
+For this end, this project proposes to investigate and evaluate various offloading strategies for next-generation programmable infrastructures running on container orchestration platforms. We propose to work towards hardware offloading using COTS devices to leverage their computing power and optimize the performance of microservice applications, while reducing load on the main processor &mdash; leaving it free to serve core application logic, instead of orchestration overheads.
+
+## Objectives
+In light of the aforementioned, the key objective of this project is to investigate and evaluate various network offloading strategies, including hardware offloading to COTS devices, such as SmartNICs and other networking related hardware such as programmable switches (_e.g._ P4 Programmable Intel Tofino).
+
+Overall, the main outcomes of this project will include a comprehensive evaluation of different offloading techniques and a practical implementation of a prototype system that demonstrates the effectiveness of the proposed approach. The results of this project will contribute to the body of knowledge in the field of network offloading, providing valuable insights for researchers, industry practitioners, and system designers.
+
+## About
+This project is part of my ongoing Master's Thesis at University of Campinas (UNICAMP). The proposed framework is under development and we have a set of publications in queue.
+
+{/*## Publications*/}
+
+## Funding
+- CPE SMARTNESS
+- _Fundação de Amparo à Pesquisa do Estado de São Paulo_ (FAPESP), code `2021/00199-8`
+- _Ericsson Telecomunicações S.A._, code `UNI.70`
+
+---
+
+<Giscus />
