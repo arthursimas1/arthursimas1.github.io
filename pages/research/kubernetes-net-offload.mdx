@@ -1,5 +1,5 @@
 ---
-title: 'OffKube: Kubernetes Networking Offload'
+title: 'eZtunnel: An eBPF-based Traffic Acceleration Mechanism for Cloud-Native Infrastructures'
 description: Offloading Strategies for Next-Generation Programmable Infrastructures
 image: /assets/research/kubernetes-net-offload/kubernetes-architecture.png
 preview: /assets/research/kubernetes-net-offload/kubernetes-icon-small.png
@@ -11,32 +11,31 @@ import BlogHeader from 'components/blog/BlogHeader'
 
 <BlogHeader />
 
-{/*<Callout type='info'>
-  **GitHub**: [x](https://x)
-</Callout>*/}
+<Callout type='info'>
+  **GitHub**: [arthursimas1/mesh-fastpath](https://github.com/arthursimas1/mesh-fastpath)\
+  **Demo**: [youtube](https://youtu.be/Zpwa4o_iDvA)
+</Callout>
 
 ## Abstract
-In the context of modern IT infrastructures, many efforts have been made to move applications to the cloud and move away from highly specialized hardware boxes to commercial-off-the-shelf (COTS) equipment. To support emerging verticals and applications that will stress network traffic even more, there is ongoing research towards cloud-native applications, including the development of a new mobile network core used in the 5G Core.
+Cloud-native applications, characterized by their scalability, resilience, and flexibility, adopt a microservices architecture to decompose applications into smaller, independently manageable services. This architecture, while offering significant benefits, introduces challenges in service-to-service communication, requiring the use of advanced orchestration and communication frameworks such as Kubernetes and Istio, respectively. However, the complexity of these technologies impose substantial overhead on the underlying infrastructure, introducing longer packet processing paths.
 
-It is clear that we need to improve resource utilization in data centers to support the growing demand for more strict infrastructure requirements &mdash; _e.g._ low latency, high throughput, high reliability, scalability, and energy efficiency; which can all be translated to cost efficiency, in the end. This is particularly important for use cases such as the 5G Core and the upcoming 6G.
+This work identifies the performance bottlenecks arising from the extensive use of service meshes, highlighting the critical issue of CPU overload due to networking-related tasks. To address these challenges, we propose eZtunnel, a transparent offloading technique to allow efficient communications in service meshes. This proposal leverages extended Berkeley Packet Filter (eBPF) as the enabler technology to address and mitigate the problem.
 
-For this end, this project proposes to investigate and evaluate various offloading strategies for next-generation programmable infrastructures running on container orchestration platforms. We propose to work towards hardware offloading using COTS devices to leverage their computing power and optimize the performance of microservice applications, while reducing load on the main processor &mdash; leaving it free to serve core application logic, instead of orchestration overheads.
+Experiments show that the proposed solution can improve intra-node networking metrics, such as reduction in average Flow Completion Time (FCT) by 41.2%, latency by 42.0%, and increase in throughput by 68.5%. Memory footprint was small, reaching at most 60.5 MB. CPU usage was variable between +29.2% and -23.2%. Through this approach, the research aims to unlock the full potential of cloud-native applications, ensuring that the architectural advancements translate into relevant benefits.
 
 ## Objectives
-In light of the aforementioned, the key objective of this project is to investigate and evaluate various network offloading strategies, including hardware offloading to COTS devices, such as SmartNICs and other networking related hardware such as programmable switches (_e.g._ P4 Programmable Intel Tofino).
+The main objective of this work is to present an overview of how service meshes work, their inherent overhead problem, and the implementation of a transparent offloading mechanism to enable efficient networking in service meshes.
 
-Overall, the main outcomes of this project will include a comprehensive evaluation of different offloading techniques and a practical implementation of a prototype system that demonstrates the effectiveness of the proposed approach. The results of this project will contribute to the body of knowledge in the field of network offloading, providing valuable insights for researchers, industry practitioners, and system designers.
-
-## About
-This project is part of my ongoing Master's Thesis at University of Campinas (UNICAMP). The proposed framework is under development and we have a set of publications in queue.
+## Context
+This project is part of my Master's Dissertation at University of Campinas (UNICAMP). The proposed framework is concluded and the resulting publications are presented below.
 
 ## Publications
-- eZtunnel: Leveraging eBPF to Transparently Offload Service Mesh Data Plane Networking, CloudNet 2024. DOI: [10.1109/CloudNet62863.2024.10815862](https://doi.org/10.1109/CloudNet62863.2024.10815862)
+- eZtunnel: Leveraging eBPF to Transparently Offload Service Mesh Data Plane Networking, CloudNet 2024. DOI - [10.1109/CloudNet62863.2024.10815862](https://doi.org/10.1109/CloudNet62863.2024.10815862), [paper](https://zenodo.org/records/14861683), [slides](https://zenodo.org/records/14945714)
 
 ## Funding
-- CPE SMARTNESS
-- _Fundação de Amparo à Pesquisa do Estado de São Paulo_ (FAPESP), code `2021/00199-8`
-- _Ericsson Telecomunicações S.A._, code `UNI.70`
+- Innovation Center, Ericsson S.A.
+- _São Paulo Research Foundation_ (FAPESP), grants `2023/05222-3` and `2021/00199-8` (CPE SMARTNESS)
+- _Coordenação de Aperfeiçoamento de Pessoal de Nível Superior_ (CAPES)- Finance Code `001`
 
 ---
 
