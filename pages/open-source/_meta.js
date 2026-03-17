@@ -1,10 +1,9 @@
-{
+module.exports = {
   "*": {
-    "display": "hidden",
     "theme": {
-      "breadcrumb": false,
+      "breadcrumb": true,
       "footer": true,
-      "sidebar": false,
+      "sidebar": true,
       "toc": true,
       "pagination": false,
       "typesetting": "article",

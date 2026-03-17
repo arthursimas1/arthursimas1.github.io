@@ -1,4 +1,4 @@
-{
+module.exports = {
   "*": {
     "theme": {
       "breadcrumb": true,
