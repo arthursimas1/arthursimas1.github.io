@@ -1,0 +1,191 @@
+---
+title: 'SIM Card: Reverse Engineering and ADM password bypass'
+description: A tale of hardware hacking, protocol decoding, and exploiting access rules to regain control of an undocumented 5G SIM card
+image: /assets/blog/sim-card-hacking/card-reader-setup.jpg
+preview: /assets/blog/sim-card-hacking/card-reader-setup.jpg
+authors:
+  - name: Arthur Simas
+    picture: /assets/people/arthursimas.jpg
+    #socialNetworks:
+    #  Twitter: arthursimas1
+---
+
+import { Callout } from 'nextra/components'
+import Giscus from 'lib/giscus'
+import BlogHeader from 'components/blog/BlogHeader'
+
+<BlogHeader />
+
+<Callout type='info'>
+  **GitHub**: [arthursimas1/sigrok_iso7816](https://github.com/arthursimas1/sigrok_iso7816)\
+  &nbsp;{/* **pySim patch**: [arthursimas1/sigrok_iso7816](https://github.com/arthursimas1/sigrok_iso7816) */}
+</Callout>
+
+I am a researcher in Electrical and Computer Engineering, specifically focusing on networking. In our lab, we run a private 5G network from a large vendor (who shall remain nameless). This setup came with about 50 SIM cards that, by design, could only be provisioned using the vendor's heavily locked-down dashboard.
+
+To experiment, we bought a SIM card kit (4x 4G SIMs + **JUST A SINGLE** 5G SIM + card reader) straight from China, branded *Oyeitimes*. We quickly realized this card was virtually undocumented. The manufacturer provided the ADM1, PIN and PUK passwords, but the card could only be written to using their proprietary, Windows-only software.
+
+We *could* have just used their software. But we are programmers. We like Linux. We like the command line. So why not reverse engineer the SIM card, extract the necessary parameters, and write a patch to the open-source `pySim`?
+
+All I had to do was sniff the messages between the SIM card and the Windows PC. Sounds easy, right? I was about to find out the hard way.
+
+## Chapter 1: The USB Proxy Illusion
+
+My first attempt at intercepting the traffic involved a Raspberry Pi 4 and the FaceDancer software stack. The goal was to create a USB proxy between the smart card reader and the Windows PC.
+
+To make the Pi 4 act as a USB device, I had to set up a USB port to enable OTG gadget mode. Because the only OTG-capable port on the Pi 4 is its USB-C power port, I had to power the board externally by hooking the GPIO pin headers up to a massive, overkill lab voltage regulator.
+
+{/*[TODO: Picture of the tiny Raspberry Pi hooked up to a comically large lab bench power supply]*/}
+
+The software worked... mostly. The Windows PC recognized the Raspberry Pi as the card reader. But as soon as the proprietary software tried to simply *read* from the card, it crashed miserably in a cascade of USB timeout errors. I was so close, yet entirely stuck.
+
+## Chapter 2: The FPGA Mirage
+
+Frustrated by the timeouts, I convinced myself the Raspberry Pi was simply too slow for the strict timing requirements of USB proxying. Naturally, my mind turned to our lab's Intel Altera educational board.
+
+
+<center>
+<img src="/assets/blog/sim-card-hacking/intel-altera-de2.jpg" alt="Intel Altera educational board" width="70%" />
+</center>
+
+<center>
+*Intel Altera educational board*
+</center>
+
+I started designing a mental architecture to implement a soft-PHY for USB 1.1 just to sniff the packets. The following morning, I woke up, ~drank some coffee~ had breakfast (I hate coffee), and realized what a terrible idea it is to casually write FPGA logic for something that should have an easier path (I actually love FPGAs, but let's be real here).
+
+## Chapter 3: Sniffing the Right Wires
+
+The USB protocol is messy.
+
+It's flawless how we can plug in our USB-C cables regardless of orientation, and the backward compatibility is practically magic.
+
+But beneath that user-friendly exterior, the USB protocol is still an absolute nightmare. The descriptors, the endpoints, the sheer overhead of state machines, the incomprehensible naming conventions that change retroactively with. Every. New. Rele—
+
+*Anyway.* Hooking into the USB line was proving too complicated. But I remembered that between the SIM card and the computer, there is *another* data line: the physical connection between the card reader and the SIM card itself. Here, the raw APDU (Application Protocol Data Unit) messages flow unencrypted at a delightfully slow pace.
+
+To go down this path, I just needed to crack open the smart card reader, solder some test probes to the correct pins (GND, CLK, I/O, RST), and attach a logic analyzer. Could I have used a logic analyzer on the USB line instead? Yes, but USB speeds require a high-end analyzer with a massive sample rate. The APDU interface, on the other hand, is delightfully slow. A cheap 24MHz logic analyzer from AliExpress was more than up to the task.
+
+{/*[TODO: Picture of the cracked-open smart card reader with wires soldered to the SIM contact pads, connected to the AliExpress logic analyzer]*/}
+
+## Chapter 4: The 0% Supported Protocol & The Trap
+
+I hooked up the wires, plugged the logic analyzer into my laptop, and fired up PulseView. Surprise: I needed a protocol decoder for smart cards.
+
+I checked the supported protocol decoders documentation for Sigrok (PulseView's backend). The support for ISO 7816 (the smart card standard) sat at a striking **0%** [[link](https://sigrok.org/wiki/Protocol_decoders#:~:text=ISO%207816,0%25)].
+
+<center>
+[![](https://imgs.xkcd.com/comics/wisdom_of_the_ancients.png)](https://xkcd.com/979/)
+</center>
+
+After a quick Google search, I found a random GitHub repository with a custom Sigrok plugin for ISO 7816. In my pure innocence, I thought it worked perfectly. I exported the capture to a PCAP file, opened it in Wireshark, and successfully grabbed the file paths needed to store the Ki and OPc keys!
+
+Now I just needed to patch `pySim`. In my innocence (again), I wrote the full patch using the cumbersome legacy pySim methods, only to later realize the modern API is infinitely more ergonomic. *What a great day to be alive*.
+
+Time to test: I inserted the SIM, plugged in the reader, and started `pySim-shell`. I traversed the directory hierarchy to the files I had sniffed... but I couldn't read or write to them.
+
+A quick Google search introduced me to **EF.ARR** (Access Rule Reference). In the telecom world, an EF.ARR file dictates the security conditions required to perform actions (like read or update) on other files in the SIM.
+
+I read the contents of the respective EF.ARR file and discovered that the paths I needed were protected by an unknown password: **ADM2**. The manufacturer had only provided ADM1 (which was `88888888`). I figured ADM2 must be something similarly lazy, like `99999999` or `00000000`.
+
+It was not.
+
+After a few bad guesses, the card locked me out completely. I had just bricked a SIM card my advisor bought with money from his own pocket.
+
+## Chapter 5: Sleepless Nights and Custom Decoders
+
+Under a cloud of deep frustration, I took a step back and looked at the raw logic analyzer signals in PulseView. The buggy GitHub decoder had clearly missed a massive chunk of messages. It couldn't handle multiple APDU sessions—delimited by a RESET rising edge followed by the ATR (Answer To Reset) message. It simply failed to correctly parse the messages that followed the ATRs.
+
+During a sleepless night, I sat down and wrote a brand-new ISO 7816 decoder for Sigrok from scratch. I fed my captures through my new decoder, exported them to PCAP, and opened Wireshark.
+
+And there it was. The Windows proprietary software sending the ADM2 password. In clear sight.
+
+## Chapter 6: The ATR
+
+At the very least, I could now use my new decoder to reverse engineer the 50 SIM cards from our private 5G lab. I set it up, sniffed the traffic, and it worked on the first try!
+
+But then I got a hint. While looking at the PulseView signals, I kept staring at the **ATR**. What *is* an ATR, after all?
+
+The Answer To Reset is the first string of bytes a smart card sends when powered on. It describes the card's communication parameters, but it also acts as a fingerprint.
+
+Using an online ATR parser (_e.g._ [smartcard-atr.apdu.fr](https://smartcard-atr.apdu.fr/)), I fed in the ATR from the unknown lab SIM cards. It spit out the exact manufacturer. I went to their website, found the product page, and right there in plain text... was the **DATASHEET**.
+
+It had *all* the juicy SIM card secret keys and structures I had just spent days sniffing. The pySim patch came like a breeze. It turns out that having detailed documentation is actually infinitely better than a USB thumb drive with proprietary software. Who knew?
+
+<center>
+[![](https://imgs.xkcd.com/comics/rtfm.png)](https://xkcd.com/293/)
+</center>
+
+## Chapter 7: Bypassing the ADM Password Lockout
+
+All that work wasn't in vain. It was extremely fun. But I still had a bricked Oyeitimes card sitting on my desk, taunting me with its locked ADM2 state.
+
+Then, as soon as I lay down on the bed, I had a realization: *What dictates the rules of the EF.ARR file itself?* I had terribly anxious dreams that night, waiting for the next morning so I could test my hypothesis. It turns out that an EF.ARR file is *also* protected by an EF.ARR file. In the case of the Oyeitimes SIM, it was governed by *itself*.
+
+And the password required to edit that EF.ARR file? **ADM1**.
+
+Since I still had the ADM1 password (`88888888`), I used `pySim` to authenticate with ADM1, opened the EF.ARR file, and promptly updated the access record for the Ki and OPc keys. I changed their required security condition from ADM2 to ADM1.
+
+It worked. The ADM2 slot is permanently locked out, but it doesn't matter anymore. I changed the locks on the doors, and now I hold the only key I need.
+
+Even though I bypassed the need for the ADM2 password by altering the file permissions, the card's internal retry counter for ADM2 is still officially maxed out. Maybe sometime in the future, when I'm looking for another yak to shave, I'll dive back into the SIM's file system and try to figure out how to manually reset that counter. But for now, the card does exactly what we need it to do.
+
+<center>
+[![](https://imgs.xkcd.com/comics/success.png)](https://xkcd.com/349/)
+</center>
+
+<center>
+*A biblically accurate visual representation of my entire week (also known as yak shaving)*
+</center>
+
+---
+
+## TL;DR: How to Reverse Engineer a SIM (Without Losing Your Mind)
+
+To save you the sleepless nights, here is the optimal workflow if you find yourself staring down an undocumented SIM card:
+
+* **Get the ATR:** Read the ATR from the SIM card using `cardinfo` in `pySim-shell`.
+    ```bash
+        (pysim-env) arthur@fedora:~/shared/Research/pysim$ ./pySim-shell.py -p0
+        Using reader PCSC[HID Global OMNIKEY 3x21 Smart Card Reader [OMNIKEY 3x21 Smart Card Reader] 00 00]
+        Waiting for card...
+        Info: Card is of type: UICC
+        INFO: Detected UICC Add-on "SIM"
+        INFO: Detected UICC Add-on "GSM-R"
+        INFO: AIDs on card:
+        INFO:  USIM: a0000000871002ffffffff8903050001 (EF.DIR)
+        INFO:  ISIM: a0000000871004ff49ffff89081500ff (EF.DIR)
+        INFO:  ARA-M: a00000015141434c00
+        INFO:  HPSIM: a000000087100a
+        INFO:  USIM-non-IMSI: a000000087100b
+        Welcome to pySim-shell!
+        (C) 2021-2023 by Harald Welte, sysmocom - s.f.m.c. GmbH and contributors
+        Online manual available at https://downloads.osmocom.org/docs/pysim/master/html/shell.html 
+        pySIM-shell (00:MF)> cardinfo
+        Card info:
+        Name: UICC
+        ATR: 3b9f94801fc78031e073fe2113578681098698621880
+        ICCID: 89000100000000000000
+        Class-Byte: 00
+        Select-Ctrl: 0004
+        AIDs:
+        a0000000871002
+        a0000000871004
+        a00000015141434c00
+        a000000087100a
+        a000000087100b
+    ```
+
+* **Identify the Card:** Check this ATR in an ATR parser website (like this one [smartcard-atr.apdu.fr](https://smartcard-atr.apdu.fr/)) to identify the hardware.
+* **RTFM:** Go to the manufacturer's product page and look for the datasheet. (Blindly googling for it rarely works; you have to navigate their site).
+* **When in Doubt, Sniff:** If you cannot find the datasheet, you'll need to inspect the raw APDU messages.
+    * *Hint 1:* Crack open the reader (or use an extension board) and use my ISO 7816 decoder for Sigrok to get clean captures: [github:arthursimas1/sigrok_iso7816](https://github.com/arthursimas1/sigrok_iso7816)
+    * *Hint 2:* When analyzing the resulting PCAP in Wireshark, use this display filter to immediately find the ADM passwords being sent: `gsm_sim.apdu.ins == 0x20`
+
+...
+
+In the end of the day, my own PhD research in networking isn't even directly related to this hunt. But thanks to this tale, my research colleague Caio can finally provision these cards and get back to running his actual SIM card experiments. And as for me, I can finally get some sleep.
+
+---
+
+<Giscus />
