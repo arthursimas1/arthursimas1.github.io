@@ -1,6 +1,6 @@
 ---
 title: 'SIM Card: Reverse Engineering and ADM password bypass'
-description: A tale of hardware hacking, protocol decoding, and exploiting access rules to regain control of an undocumented 5G SIM card
+description: A saga of hardware hacking, protocol decoding, and exploiting access rules to regain control of an undocumented 5G SIM card
 tags:
   - reverse-engineering
   - smart-card
@@ -89,7 +89,6 @@ To go down this path, I just needed to crack open the smart card reader, solder 
 *SIM card pinout*
 </center>
 
-<center>
 | **Contact pad** | **Signal** |
 |:---------------:|:----------:|
 |        C1       |     VCC    |
@@ -100,7 +99,6 @@ To go down this path, I just needed to crack open the smart card reader, solder 
 |        C6       |     VPP    |
 |      **C7**\*   |   **I/O**  |
 |        C8       |  RESERVED  |
-</center>
 
 <center className='mt-8'>
 <img src="/assets/blog/sim-card-hacking/card-reader-setup.jpg" alt="The smart card reader wired to the logic analyzer" width="70%" />
@@ -179,15 +177,88 @@ It had *all* the juicy SIM card secret keys and structures I had just spent days
 
 All that work wasn't in vain. It was extremely fun. But I still had a bricked Oyeitimes card sitting on my desk, taunting me with its locked ADM2 state.
 
-Then, as soon as I lay down on the bed, I had a realization: *What dictates the rules of the EF.ARR file itself?* I had terribly anxious dreams that night, waiting for the next morning so I could test my hypothesis. It turns out that an EF.ARR file is *also* protected by an EF.ARR file. In the case of the Oyeitimes SIM, it was governed by *itself*.
+Then, as soon as I lay down on bed, I had a realization: *What dictates the rules of the EF.ARR file itself?* I had terribly anxious dreams that night, waiting for the next morning so I could test my hypothesis. It turns out that an EF.ARR file is *also* protected by an EF.ARR file. In the case of this Oyeitimes SIM, it was governed by *itself*.
 
-And the password required to edit that EF.ARR file? **ADM1**.
+And the password required to edit that EF.ARR file?
+
+**ADM1**.
 
 Since I still had the ADM1 password (`88888888`), I used `pySim` to authenticate with ADM1, opened the EF.ARR file, and promptly updated the access record for the Ki and OPc keys. I changed their required security condition from ADM2 to ADM1.
 
-It worked. The ADM2 slot is permanently locked out, but it doesn't matter anymore. I changed the locks on the doors, and now I hold the only key I need.
+It worked. I had changed the locks on the doors, and now I held the only key I needed. The ADM2 slot was permanently locked out, but it didn't matter anymore because I had bypassed it completely.
 
-Even though I bypassed the need for the ADM2 password by altering the file permissions, the card's internal retry counter for ADM2 is still officially maxed out. Maybe sometime in the future, when I'm looking for another yak to shave, I'll dive back into the SIM's file system and try to figure out how to manually reset that counter. But for now, the card does exactly what we need it to do.
+Even though I had successfully sidestepped the password by altering the file permissions, it still bothered me to know that the card's internal retry counter for ADM2 was maxed out.
+
+...Or at least I thought so.
+
+I was sitting there with a yak only halfway shaved, and I simply couldn't hold myself back from fully shaving it.
+
+I decided to take one last try at my Wireshark captures.
+
+While scrolling through the APDU logs, I noticed something I had completely overlooked at first glance: the proprietary software was writing the PIN and ADM passwords directly across the SIM card's filesystem. Because this SIM provides more than one application (USIM, ISIM, GSM), the passwords are distributed across different files to support them.
+
+<center className='mt-8'>
+![](/assets/blog/sim-card-hacking/wireshark-pins-screencapture.png)
+</center>
+
+With this realization in mind, I fired up `pySim-shell` and decided to poke around the files I saw in the capture.
+
+Right on the first try, I found gold:
+
+```shell
+pySIM-shell (00:MF)# select MF/0003
+pySim-shell (00:MF/0003)# read_records
+001 010001003331323334ffffffff
+002 0a80ff00333838383838383838
+003 0b80ff00a03534333439383741
+004 11100100aa3838383838383838
+005 ffffffffffffffffffffffffff
+006 ffffffffffffffffffffffffff
+007 ffffffffffffffffffffffffff
+008 ffffffffffffffffffffffffff
+009 ffffffffffffffffffffffffff
+```
+
+For clarity:
+
+| Record index | Pin index | Unknown  | Counter | Password (ASCII hex)                 |
+|--------------|-----------|----------|---------|--------------------------------------|
+| `001`        | `01`      | `000100` | `33`    | `31323334ffffffff` # PIN1 (1234)     |
+| `002`        | `0a`      | `80ff00` | `33`    | `3838383838383838` # ADM1 (88888888) |
+| `003`        | `0b`      | `80ff00` | `a0`    | `3534333439383741` # ADM2 (5434987A) |
+| `004`        | `11`      | `100100` | `aa`    | `3838383838383838` # PUK1 (88888888) |
+
+I could immediately identify the familiar ASCII hex characters representing the passwords at the end of each line (for example, `3838383838383838` translates directly to `88888888`). But I needed to decipher the preceding bytes to understand how the lock worked:
+
+* **Pin index:** The second column represents the index identifier for the password. Standard user PINs usually get lower indices (like `01` for PIN1), while administrative passwords follow the standard of using higher indices (e.g., `0a` for ADM1, `0b` for ADM2).
+* **The counter:** The real secret lay in the final byte right before the ASCII password. This byte acts as `{max attempts}{remaining attempts}`.
+
+Looking at record `003` (ADM2), the counter byte was `a0`. In hexadecimal, `a` equals 10. So, the card allows **10 total attempts**, and currently had **0 remaining attempts**. No wonder it was bricked.
+
+The fix was incredibly obvious. I just had to be sure that the respective EF.ARR record allowed me to write to this file, and then manually overwrite that `a0` byte to `aa`, resetting the remaining attempts back to 10.
+
+I threw the following command into `pySim-shell`:
+```text
+update_record 3 0b80ff00aa3534333439383741
+```
+
+Now, it was time to test the unlock.
+
+```text
+verify_adm --adm-type ADM2 5434987A
+```
+
+It failed...
+
+After a brief moment of confusion, I realized what was happening. When passing the ASCII password, `pySim` converts it to lowercase (sending `5434987a` instead of `5434987A`). To bypass this string conversion, I forced it to use the raw hex values:
+
+```text
+verify_adm --adm-type ADM2 --pin-is-hex 3534333439383741
+```
+
+That was the last puzzle piece. Not only had I bypassed the ADM2 lock earlier, but I had now completely revived the card from its bricked state. Since I now knew *all* the passwords for this SIM, I happily reverted the EF.ARR records back to their original factory shape.
+
+Now, the card does exactly what we need it to do. The yak is, officially, fully shaved.
 
 <center className='mt-8'>
 [![](https://imgs.xkcd.com/comics/success.png)](https://xkcd.com/349/)
@@ -204,7 +275,7 @@ Even though I bypassed the need for the ADM2 password by altering the file permi
 To save you the sleepless nights, here is the optimal workflow if you find yourself staring down an undocumented SIM card:
 
 * **Get the ATR:** Read the ATR from the SIM card using `cardinfo` in `pySim-shell`.
-    ```bash
+    ```shell
         (pysim-env) arthur@fedora:~/shared/Research/pysim$ ./pySim-shell.py -p0
         Using reader PCSC[HID Global OMNIKEY 3x21 Smart Card Reader [OMNIKEY 3x21 Smart Card Reader] 00 00]
         Waiting for card...
@@ -252,7 +323,7 @@ To save you the sleepless nights, here is the optimal workflow if you find yours
 
 ...
 
-In the end of the day, my own PhD research in networking isn't even directly related to this hunt. But thanks to this tale, my research colleague Caio can finally provision these cards and get back to running his actual SIM card experiments. And as for me, I can finally get some sleep.
+In the end of the day, my own PhD research in networking isn't even directly related to this hunt. But thanks to this saga, my research colleague Caio can finally provision these cards and get back to running his actual SIM card experiments. And as for me, I can finally get some sleep.
 
 ---
 
