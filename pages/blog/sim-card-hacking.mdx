@@ -185,9 +185,9 @@ And the password required to edit that EF.ARR file?
 
 Since I still had the ADM1 password (`88888888`), I used `pySim` to authenticate with ADM1, opened the EF.ARR file, and promptly updated the access record for the Ki and OPc keys. I changed their required security condition from ADM2 to ADM1.
 
-It worked. I had changed the locks on the doors, and now I held the only key I needed. The ADM2 slot was permanently locked out, but it didn't matter anymore because I had bypassed it completely.
+It worked. The card's internal retry counter for ADM2 was maxed out, but it didn't matter anymore because I had bypassed it completely. I had changed the locks on the doors, and held the only key I needed.
 
-Even though I had successfully sidestepped the password by altering the file permissions, it still bothered me to know that the card's internal retry counter for ADM2 was maxed out.
+Even though I had successfully sidestepped the password by altering the file permissions, it still bothered me to know that the ADM2 slot was permanently locked out.
 
 ...Or at least I thought so.
 
@@ -242,7 +242,7 @@ I threw the following command into `pySim-shell`:
 update_record 3 0b80ff00aa3534333439383741
 ```
 
-Now, it was time to test the unlock.
+Then, tested the unlock:
 
 ```text
 verify_adm --adm-type ADM2 5434987A
@@ -256,7 +256,7 @@ After a brief moment of confusion, I realized what was happening. When passing t
 verify_adm --adm-type ADM2 --pin-is-hex 3534333439383741
 ```
 
-That was the last puzzle piece. Not only had I bypassed the ADM2 lock earlier, but I had now completely revived the card from its bricked state. Since I now knew *all* the passwords for this SIM, I happily reverted the EF.ARR records back to their original factory shape.
+That was the last puzzle piece. Not only had I bypassed the ADM2 lock earlier, but I had also completely revived the card from its bricked state. Since I finally knew *all* the passwords for this SIM, I happily reverted the EF.ARR records back to their original factory shape.
 
 Now, the card does exactly what we need it to do. The yak is, officially, fully shaved.
 
@@ -276,38 +276,38 @@ To save you the sleepless nights, here is the optimal workflow if you find yours
 
 * **Get the ATR:** Read the ATR from the SIM card using `cardinfo` in `pySim-shell`.
     ```shell
-        (pysim-env) arthur@fedora:~/shared/Research/pysim$ ./pySim-shell.py -p0
-        Using reader PCSC[HID Global OMNIKEY 3x21 Smart Card Reader [OMNIKEY 3x21 Smart Card Reader] 00 00]
-        Waiting for card...
-        Info: Card is of type: UICC
-        INFO: Detected UICC Add-on "SIM"
-        INFO: Detected UICC Add-on "GSM-R"
-        INFO: AIDs on card:
-        INFO:  USIM: a0000000871002ffffffff8903050001 (EF.DIR)
-        INFO:  ISIM: a0000000871004ff49ffff89081500ff (EF.DIR)
-        INFO:  ARA-M: a00000015141434c00
-        INFO:  HPSIM: a000000087100a
-        INFO:  USIM-non-IMSI: a000000087100b
-        Welcome to pySim-shell!
-        (C) 2021-2023 by Harald Welte, sysmocom - s.f.m.c. GmbH and contributors
-        Online manual available at https://downloads.osmocom.org/docs/pysim/master/html/shell.html 
-        pySIM-shell (00:MF)> cardinfo
-        Card info:
-        Name: UICC
-        ATR: 3b9f94801fc78031e073fe2113578681098698621880
-        ICCID: 89000100000000000000
-        Class-Byte: 00
-        Select-Ctrl: 0004
-        AIDs:
-        a0000000871002
-        a0000000871004
-        a00000015141434c00
-        a000000087100a
-        a000000087100b
+    (pysim-env) arthur@fedora:~/shared/Research/pysim$ ./pySim-shell.py -p0
+    Using reader PCSC[HID Global OMNIKEY 3x21 Smart Card Reader [OMNIKEY 3x21 Smart Card Reader] 00 00]
+    Waiting for card...
+    Info: Card is of type: UICC
+    INFO: Detected UICC Add-on "SIM"
+    INFO: Detected UICC Add-on "GSM-R"
+    INFO: AIDs on card:
+    INFO:  USIM: a0000000871002ffffffff8903050001 (EF.DIR)
+    INFO:  ISIM: a0000000871004ff49ffff89081500ff (EF.DIR)
+    INFO:  ARA-M: a00000015141434c00
+    INFO:  HPSIM: a000000087100a
+    INFO:  USIM-non-IMSI: a000000087100b
+    Welcome to pySim-shell!
+    (C) 2021-2023 by Harald Welte, sysmocom - s.f.m.c. GmbH and contributors
+    Online manual available at https://downloads.osmocom.org/docs/pysim/master/html/shell.html 
+    pySIM-shell (00:MF)> cardinfo
+    Card info:
+    Name: UICC
+    ATR: 3b9f94801fc78031e073fe2113578681098698621880
+    ICCID: 89000100000000000000
+    Class-Byte: 00
+    Select-Ctrl: 0004
+    AIDs:
+    a0000000871002
+    a0000000871004
+    a00000015141434c00
+    a000000087100a
+    a000000087100b
     ```
 
 * **Identify the Card:** Check this ATR in an ATR parser website (like this one [smartcard-atr.apdu.fr](https://smartcard-atr.apdu.fr/)) to identify the hardware.
-* **RTFM:** Go to the manufacturer's product page and look for the datasheet. (Blindly googling for it rarely works; you have to navigate their site).
+* **RTFM:** Go to the manufacturer's product page and look for the datasheet. Blindly googling for it not always works. You have to navigate their site.
 * **When in Doubt, Sniff:** If you cannot find the datasheet, you'll need to inspect the raw APDU messages.
     * *Hint 1:* Crack open the reader (or use a SIM card converter board) and use my ISO 7816 decoder for Sigrok to get clean captures: [github:arthursimas1/sigrok_iso7816](https://github.com/arthursimas1/sigrok_iso7816)
 
