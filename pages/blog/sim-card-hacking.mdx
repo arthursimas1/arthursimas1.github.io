@@ -1,7 +1,11 @@
 ---
 title: 'SIM Card: Reverse Engineering and ADM password bypass'
 description: A tale of hardware hacking, protocol decoding, and exploiting access rules to regain control of an undocumented 5G SIM card
-image: /assets/blog/sim-card-hacking/card-reader-setup.jpg
+tags:
+  - reverse-engineering
+  - smart-card
+  - 5G
+image: /assets/blog/sim-card-hacking/messy-lab-bench.jpg
 preview: /assets/blog/sim-card-hacking/card-reader-setup.jpg
 authors:
   - name: Arthur Simas
@@ -33,18 +37,29 @@ All I had to do was sniff the messages between the SIM card and the Windows PC. 
 
 My first attempt at intercepting the traffic involved a Raspberry Pi 4 and the FaceDancer software stack. The goal was to create a USB proxy between the smart card reader and the Windows PC.
 
-To make the Pi 4 act as a USB device, I had to set up a USB port to enable OTG gadget mode. Because the only OTG-capable port on the Pi 4 is its USB-C power port, I had to power the board externally by hooking the GPIO pin headers up to a massive, overkill lab voltage regulator.
+To make the Pi 4 act as a USB device, I had to set up a USB port to enable OTG gadget mode. According to the [official Raspberry Pi documentation](https://pip-assets.raspberrypi.com/categories/685-app-notes-guides-whitepapers/documents/RP-009276-WP/Using-OTG-mode-on-Raspberry-Pi-SBCs), the USB-C port on the Pi's 4 and 5 supports peripheral mode, but it can only do this if it's *not* being used to power the board.
 
-{/*[TODO: Picture of the tiny Raspberry Pi hooked up to a comically large lab bench power supply]*/}
+To pull this off, you have to power the Pi directly through the 5V and GND GPIO pins, leaving the USB-C port free to connect to the host computer. On the software side, it just takes adding this line to the very end of the `/boot/firmware/config.txt` file:
+
+```text filename="/boot/firmware/config.txt"
+dtoverlay=dwc2,dr_mode=peripheral
+```
+
+But there is one more critical hardware hack required. You can't just plug a standard USB-C cable between the host PC and the Pi. If the PC tries to push 5V down the line while the Pi is already powered by an external source, you risk a power conflict that could fry your hardware. To prevent this, I had to rip into the USB cable's shielding and cut the VCC wire so it would only transmit data and ground.
+
+So, I hooked the GPIO pin headers up to a massive bench lab voltage regulator, sacrificed a USB cable, and wired everything together.
+
+{/*[TODO: Picture of the complete setup: SIM card, card reader, Raspberry Pi, massive lab power source, modified USB cable with severed VCC, and laptop]*/}
 
 The software worked... mostly. The Windows PC recognized the Raspberry Pi as the card reader. But as soon as the proprietary software tried to simply *read* from the card, it crashed miserably in a cascade of USB timeout errors. I was so close, yet entirely stuck.
 
 ## Chapter 2: The FPGA Mirage
 
-Frustrated by the timeouts, I convinced myself the Raspberry Pi was simply too slow for the strict timing requirements of USB proxying. Naturally, my mind turned to our lab's Intel Altera educational board.
+Frustrated by the timeouts, I convinced myself the Raspberry Pi was simply too slow for the strict timing requirements of USB proxying.
 
+I knew that dedicated hardware like actual FaceDancer boards or a GreatFET existed for this exact purpose and would probably handle the timing flawlessly. But I didn't have one lying around, and waiting for shipping wasn't an option. Naturally, my mind turned to our lab's Intel Altera educational board.
 
-<center>
+<center className='mt-8'>
 <img src="/assets/blog/sim-card-hacking/intel-altera-de2.jpg" alt="Intel Altera educational board" width="70%" />
 </center>
 
@@ -64,9 +79,36 @@ But beneath that user-friendly exterior, the USB protocol is still an absolute n
 
 *Anyway.* Hooking into the USB line was proving too complicated. But I remembered that between the SIM card and the computer, there is *another* data line: the physical connection between the card reader and the SIM card itself. Here, the raw APDU (Application Protocol Data Unit) messages flow unencrypted at a delightfully slow pace.
 
-To go down this path, I just needed to crack open the smart card reader, solder some test probes to the correct pins (GND, CLK, I/O, RST), and attach a logic analyzer. Could I have used a logic analyzer on the USB line instead? Yes, but USB speeds require a high-end analyzer with a massive sample rate. The APDU interface, on the other hand, is delightfully slow. A cheap 24MHz logic analyzer from AliExpress was more than up to the task.
+To go down this path, I just needed to crack open the smart card reader, solder some test probes to the correct pins (C2-RESET, C3-CLOCK, C5-GND, C7-I/O), and attach a logic analyzer. Could I have used a logic analyzer on the USB line instead? Yes, but USB speeds require a high-end analyzer with a massive sample rate. The APDU interface, on the other hand, is delightfully slow. A cheap 24MHz logic analyzer from AliExpress was more than up to the task.
 
-{/*[TODO: Picture of the cracked-open smart card reader with wires soldered to the SIM contact pads, connected to the AliExpress logic analyzer]*/}
+<center className='mt-8'>
+<img src="/assets/blog/sim-card-hacking/sim-card-pinout.jpg" alt="SIM card pinout" width="70%" />
+</center>
+
+<center>
+*SIM card pinout*
+</center>
+
+<center>
+| **Contact pad** | **Signal** |
+|:---------------:|:----------:|
+|        C1       |     VCC    |
+|      **C2**\*   |  **RESET** |
+|      **C3**\*   |  **CLOCK** |
+|        C4       |  RESERVED  |
+|      **C5**\*   |   **GND**  |
+|        C6       |     VPP    |
+|      **C7**\*   |   **I/O**  |
+|        C8       |  RESERVED  |
+</center>
+
+<center className='mt-8'>
+<img src="/assets/blog/sim-card-hacking/card-reader-setup.jpg" alt="The smart card reader wired to the logic analyzer" width="70%" />
+</center>
+
+<center>
+*The smart card reader wired to the logic analyzer*
+</center>
 
 ## Chapter 4: The 0% Supported Protocol & The Trap
 
@@ -74,7 +116,7 @@ I hooked up the wires, plugged the logic analyzer into my laptop, and fired up P
 
 I checked the supported protocol decoders documentation for Sigrok (PulseView's backend). The support for ISO 7816 (the smart card standard) sat at a striking **0%** [[link](https://sigrok.org/wiki/Protocol_decoders#:~:text=ISO%207816,0%25)].
 
-<center>
+<center className='mt-8'>
 [![](https://imgs.xkcd.com/comics/wisdom_of_the_ancients.png)](https://xkcd.com/979/)
 </center>
 
@@ -100,6 +142,23 @@ During a sleepless night, I sat down and wrote a brand-new ISO 7816 decoder for 
 
 And there it was. The Windows proprietary software sending the ADM2 password. In clear sight.
 
+<center className='mt-8'>
+![](/assets/blog/sim-card-hacking/wireshark-adm2-screenshot.png)
+</center>
+
+<center>
+*The ADM2 password. `5434987A`*
+</center>
+
+<center className='mt-8'>
+![](/assets/blog/sim-card-hacking/pulseview-wrong-vs-correct-parsing-screenshot.png)
+</center>
+
+<center>
+*A comparison of ISO 7816 protocol decoders in PulseView: The top track shows the flawed decoder failing to handle multiple APDU sessions, incorrectly grouping the APDU messages into a single block. The bottom track shows my custom decoder correctly isolating each ATR and following APDU messages*
+</center>
+
+
 ## Chapter 6: The ATR
 
 At the very least, I could now use my new decoder to reverse engineer the 50 SIM cards from our private 5G lab. I set it up, sniffed the traffic, and it worked on the first try!
@@ -112,7 +171,7 @@ Using an online ATR parser (_e.g._ [smartcard-atr.apdu.fr](https://smartcard-atr
 
 It had *all* the juicy SIM card secret keys and structures I had just spent days sniffing. The pySim patch came like a breeze. It turns out that having detailed documentation is actually infinitely better than a USB thumb drive with proprietary software. Who knew?
 
-<center>
+<center className='mt-8'>
 [![](https://imgs.xkcd.com/comics/rtfm.png)](https://xkcd.com/293/)
 </center>
 
@@ -130,7 +189,7 @@ It worked. The ADM2 slot is permanently locked out, but it doesn't matter anymor
 
 Even though I bypassed the need for the ADM2 password by altering the file permissions, the card's internal retry counter for ADM2 is still officially maxed out. Maybe sometime in the future, when I'm looking for another yak to shave, I'll dive back into the SIM's file system and try to figure out how to manually reset that counter. But for now, the card does exactly what we need it to do.
 
-<center>
+<center className='mt-8'>
 [![](https://imgs.xkcd.com/comics/success.png)](https://xkcd.com/349/)
 </center>
 
@@ -179,7 +238,16 @@ To save you the sleepless nights, here is the optimal workflow if you find yours
 * **Identify the Card:** Check this ATR in an ATR parser website (like this one [smartcard-atr.apdu.fr](https://smartcard-atr.apdu.fr/)) to identify the hardware.
 * **RTFM:** Go to the manufacturer's product page and look for the datasheet. (Blindly googling for it rarely works; you have to navigate their site).
 * **When in Doubt, Sniff:** If you cannot find the datasheet, you'll need to inspect the raw APDU messages.
-    * *Hint 1:* Crack open the reader (or use an extension board) and use my ISO 7816 decoder for Sigrok to get clean captures: [github:arthursimas1/sigrok_iso7816](https://github.com/arthursimas1/sigrok_iso7816)
+    * *Hint 1:* Crack open the reader (or use a SIM card converter board) and use my ISO 7816 decoder for Sigrok to get clean captures: [github:arthursimas1/sigrok_iso7816](https://github.com/arthursimas1/sigrok_iso7816)
+
+<center className='mt-8'>
+<img src="/assets/blog/sim-card-hacking/sim-card-converter.jpg" alt="SIM card converter board" width="50%" />
+</center>
+
+<center>
+*SIM card converter board*
+</center>
+
     * *Hint 2:* When analyzing the resulting PCAP in Wireshark, use this display filter to immediately find the ADM passwords being sent: `gsm_sim.apdu.ins == 0x20`
 
 ...
