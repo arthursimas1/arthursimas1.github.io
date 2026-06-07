@@ -75,7 +75,7 @@ The USB protocol is messy.
 
 It's flawless how we can plug in our USB-C cables regardless of orientation, and the backward compatibility is practically magic.
 
-But beneath that user-friendly exterior, the USB protocol is still an absolute nightmare. The descriptors, the endpoints, the sheer overhead of state machines, the incomprehensible naming conventions that change retroactively with. Every. New. Rele—
+But beneath that user-friendly exterior, the USB protocol is still an absolute nightmare. The descriptors, the endpoints, the sheer overhead of state machines, the incomprehensible naming conventions that change retroactively. Every. New. Rele—
 
 *Anyway.* Hooking into the USB line was proving too complicated. But I remembered that between the SIM card and the computer, there is *another* data line: the physical connection between the card reader and the SIM card itself. Here, the raw APDU (Application Protocol Data Unit) messages flow unencrypted at a delightfully slow pace.
 
@@ -120,13 +120,58 @@ I checked the supported protocol decoders documentation for Sigrok (PulseView's 
 
 After a quick Google search, I found a random GitHub repository with a custom Sigrok plugin for ISO 7816. In my pure innocence, I thought it worked perfectly. I exported the capture to a PCAP file, opened it in Wireshark, and successfully grabbed the file paths needed to store the Ki and OPc keys!
 
-Now I just needed to patch `pySim`. In my innocence (again), I wrote the full patch using the cumbersome legacy pySim methods, only to later realize the modern API is infinitely more ergonomic. *What a great day to be alive*.
+Now I just needed to patch `pySim`. In my innocence (again), I wrote the full patch using the cumbersome legacy `pySim` methods, only to later realize the modern API is infinitely more ergonomic. *What a great day to be alive*.
 
 Time to test: I inserted the SIM, plugged in the reader, and started `pySim-shell`. I traversed the directory hierarchy to the files I had sniffed... but I couldn't read or write to them.
 
 A quick Google search introduced me to **EF.ARR** (Access Rule Reference). In the telecom world, an EF.ARR file dictates the security conditions required to perform actions (like read or update) on other files in the SIM.
 
-I read the contents of the respective EF.ARR file and discovered that the paths I needed were protected by an unknown password: **ADM2**. The manufacturer had only provided ADM1 (which was `88888888`). I figured ADM2 must be something similarly lazy, like `99999999` or `00000000`.
+I read the contents of the respective EF.ARR file and discovered that the paths I needed were protected by an unknown password: **ADM2**.
+
+```shell /"ef_arr_file_id": "6f06"/ /"ef_arr_record_nr": 16/ /"control_reference_template": "ADM2"/
+pySIM-shell (00:MF)# select MF/DF.SYSTEM/EF.Ki
+{
+    "file_descriptor": {
+        "file_descriptor_byte": {
+            "shareable": true,
+            "file_type": "working_ef",
+            "structure": "transparent"
+        },
+        "record_len": null,
+        "num_of_rec": null
+    },
+    "file_identifier": "ff02",
+    "life_cycle_status_integer": "operational_activated",
+    "security_attrib_referenced": {
+        "ef_arr_file_id": "6f06",
+        "ef_arr_record_nr": 16
+    },
+    "file_size": 16,
+    "short_file_identifier": null
+}
+pySIM-shell (00:MF/DF.SYSTEM/EF.Ki)# select MF/DF.SYSTEM/6f06
+{
+    # omitted for brevity
+}
+pySIM-shell (00:MF/DF.SYSTEM/6f06)# read_record_decoded 16
+[
+    [
+        {
+            "access_mode": [
+                "activate_file_or_record",
+                "deactivate_file_or_record",
+                "update_erase",
+                "read_search_compare"
+            ]
+        },
+        {
+            "control_reference_template": "ADM2"
+        }
+    ]
+]
+```
+
+The manufacturer had only provided ADM1 (which was `88888888`). I figured ADM2 must be something similarly lazy, like `99999999` or `00000000`.
 
 It was not.
 
@@ -167,7 +212,7 @@ The Answer To Reset is the first string of bytes a smart card sends when powered
 
 Using an online ATR parser (_e.g._ [smartcard-atr.apdu.fr](https://smartcard-atr.apdu.fr/)), I fed in the ATR from the unknown lab SIM cards. It spit out the exact manufacturer. I went to their website, found the product page, and right there in plain text... was the **DATASHEET**.
 
-It had *all* the juicy SIM card secret keys and structures I had just spent days sniffing. The pySim patch came like a breeze. It turns out that having detailed documentation is actually infinitely better than a USB thumb drive with proprietary software. Who knew?
+It had *all* the juicy SIM card secret keys and structures I had just spent days sniffing. The `pySim` patch came like a breeze. It turns out that having detailed documentation is actually infinitely better than a USB thumb drive with proprietary software. Who knew?
 
 <center className='mt-8'>
 [![](https://imgs.xkcd.com/comics/rtfm.png)](https://xkcd.com/293/)
@@ -179,11 +224,71 @@ All that work wasn't in vain. It was extremely fun. But I still had a bricked Oy
 
 Then, as soon as I lay down on bed, I had a realization: *What dictates the rules of the EF.ARR file itself?* I had terribly anxious dreams that night, waiting for the next morning so I could test my hypothesis. It turns out that an EF.ARR file is *also* protected by an EF.ARR file. In the case of this Oyeitimes SIM, it was governed by *itself*.
 
+```shell /"ef_arr_file_id": "6f06"/ /"ef_arr_record_nr": 3/
+pySIM-shell (00:MF)# select MF/DF.SYSTEM/6f06
+{
+    "file_descriptor": {
+        "file_descriptor_byte": {
+            "shareable": true,
+            "file_type": "working_ef",
+            "structure": "linear_fixed"
+        },
+        "record_len": 44,
+        "num_of_rec": 18
+    },
+    "file_identifier": "6f06",
+    "proprietary_information": {
+        "uicc_characteristics": "71"
+    },
+    "life_cycle_status_integer": "operational_activated",
+    "security_attrib_referenced": {
+        "ef_arr_file_id": "6f06",
+        "ef_arr_record_nr": 3
+    },
+    "file_size": 792,
+    "short_file_identifier": 23
+}
+```
+
 And the password required to edit that EF.ARR file?
 
 **ADM1**.
 
-Since I still had the ADM1 password (`88888888`), I used `pySim` to authenticate with ADM1, opened the EF.ARR file, and promptly updated the access record for the Ki and OPc keys. I changed their required security condition from ADM2 to ADM1.
+```shell /"control_reference_template": "ADM1"/
+pySIM-shell (00:MF/DF.SYSTEM/6f06)# read_record_decoded 3
+[
+    [
+        {
+            "access_mode": [
+                "read_search_compare"
+            ]
+        },
+        {
+            "always": null
+        }
+    ],
+    [
+        {
+            "access_mode": [
+                "activate_file_or_record",
+                "deactivate_file_or_record",
+                "update_erase"
+            ]
+        },
+        {
+            "control_reference_template": "ADM1"
+        }
+    ]
+]
+```
+
+Because I was already authenticated using the ADM1 password (`88888888`), I was able to open the EF.ARR file using `pySim` and promptly update the access record for the Ki and OPc keys. I changed their required security condition from ADM2 to ADM1:
+
+```shell
+pySIM-shell (00:MF/DF.SYSTEM/6f06)# update_record_decoded 16 '[[{"access_mode": ["activate_file_or_record","deactivate_file_or_record","update_erase","read_search_compare"]},{"control_reference_template": "ADM1"}]]'
+```
+
+*(Apologies for the long, single-line format. `pySim` requires the entire JSON payload to be passed on one line.)*
 
 It worked. The card's internal retry counter for ADM2 was maxed out, but it didn't matter anymore because I had bypassed it completely. I had changed the locks on the doors, and held the only key I needed.
 
@@ -195,7 +300,7 @@ I was sitting there with a yak only halfway shaved, and I simply couldn't hold m
 
 I decided to take one last try at my Wireshark captures.
 
-While scrolling through the APDU logs, I noticed something I had completely overlooked at first glance: the proprietary software was writing the PIN and ADM passwords directly across the SIM card's filesystem. Because this SIM provides more than one application (USIM, ISIM, GSM), the passwords are distributed across different files to support them.
+While scrolling through the APDU logs, I noticed something I had completely overlooked at first glance: the proprietary software was writing the PIN and ADM passwords directly across the SIM card's filesystem. Because this Oyeitimes SIM provides more than one application (USIM, ISIM, ARA-M, HPSIM, USIM-non-IMSI), the passwords are distributed across different files to support them.
 
 <center className='mt-8'>
 ![](/assets/blog/sim-card-hacking/wireshark-pins-screencapture.png)
